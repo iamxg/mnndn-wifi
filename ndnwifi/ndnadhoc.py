@@ -112,7 +112,7 @@ def build_adhocnet(adhocTopo, isManet, isAdhoc, ssid, channel, mode, wmediumd, i
 
     info('\n*** Configuring propagation model...\n')
     # this code line must be put here
-    adhocnet.propagationModel("logDistancePropagationLossModel", exp=5)
+    adhocnet.propagationModel(model="logDistance", exp=5)
     #Only can use this propagation model
 
     info('\n*** Configuring wifi nodes...\n')
@@ -130,7 +130,7 @@ def build_adhocnet(adhocTopo, isManet, isAdhoc, ssid, channel, mode, wmediumd, i
     if isManet:
         adhocnet.seed(random.randint(0, 100))
         # this code line must be put here
-        adhocnet.startMobility(startTime=0, model='RandomWayPoint', max_x=100, max_y=100, max_z=0, min_v=0.5, max_v=0.8)
+        adhocnet.startMobility(time=0,  model='RandomWayPoint', max_x=100, max_y=100, max_z=0, min_v=0.5, max_v=0.8)
     adhocnet.build()
 
     # Load experiment
@@ -140,6 +140,8 @@ def build_adhocnet(adhocTopo, isManet, isAdhoc, ssid, channel, mode, wmediumd, i
 
         experimentArgs = {
             "isWiFi":True,
+            "isVndn":False,
+            "isSumoVndn":False,
             "net": adhocnet,
             "ctime": ctime,
             "nPings": nPings,

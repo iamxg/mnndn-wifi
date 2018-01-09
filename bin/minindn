@@ -71,7 +71,7 @@ from mininet.examples.clustercli import ClusterCLI
 from ndnwifi import WifiExperimentManager
 from mini_ndn.ndn.ndn_host import NdnHost, CpuLimitedNdnHost, RemoteNdnHost
 from mini_ndn.ndn.conf_parser import parse_hosts, parse_switches, parse_links
-from ndnwifi.wificonf_parser import parse_stations, parse_cars, parse_accessPoints # add parse_stations,accessPoints
+from ndnwifi.wificonf_parser import parse_stations, parse_cars, parse_accessPoints # add parse_stations,prase_cars and parse_accessPoints
 # from ndn.remote_ndn_link import RemoteNdnLink, RemoteGRENdnLink
 from mini_ndn.ndn.placer import GuidedPlacer, PopulatePlacement
 from mini_ndn.ndn.util import ssh, scp, MiniNDNCLI
@@ -113,7 +113,7 @@ class PrintExperimentNames(argparse.Action):
 
 class ProgramOptions:
     def __init__(self):
-        self.ctime = 30
+        self.ctime = 60
         self.experimentName = None
         self.nFaces = 3
         self.templateFile = "minindn.conf"
@@ -160,7 +160,7 @@ def parse_args():
     parser.add_argument('tempfile', nargs='?', default=INSTALL_DIR + 'default-topology.conf',
                         help="If no template_file is given, ndn_utils/default-topology.conf (given sample file) will be used.")
 
-    parser.add_argument("--ctime", type=int, default=30,
+    parser.add_argument("--ctime", type=int, default=60,
                         help="Specify convergence time for the topology (Default: 60 seconds)")
 
     parser.add_argument("--experiment",
@@ -220,7 +220,7 @@ def parse_args():
     parser.add_argument('--radios',  default=0, help='starting k radios')
     parser.add_argument('--wmediumd', action='store_true', default=False, help='activate wmediumd') #for ad hoc network
     parser.add_argument('--interference', action='store_true', default=False, help='activate wmediumd') #for ad hoc network
-    parser.add_argument('--channel', default=1, help='wireless channel configuration')
+    parser.add_argument('--channel', default="1", help='wireless channel configuration')
     parser.add_argument('--mode', default="g", help='wireless mode configuration')
     parser.add_argument('--ssid', default="adhocNet", help='wireless ssid configuration')
     parser.add_argument('--adhoc', action='store_true', default=False, help='build ad hoc network')
@@ -274,7 +274,11 @@ def parse_args():
         if options.isAdhoc or options.isManet:
             options.templateFile = INSTALL_DIR + 'wifi/adhoc-topology.conf'
         else:
-            options.templateFile = INSTALL_DIR + 'wifi/singleap-topology.conf'
+            if options.isVndn or options.isSumoVndn:
+                options.templateFile = INSTALL_DIR + 'wifi/vndn-topology.conf'
+            else:
+                options.templateFile = INSTALL_DIR + 'wifi/singleap-topology.conf'
+
     if options.experimentName is not None and options.experimentName not in WifiExperimentManager.getExperimentNames():
         print("No experiment named %s" % options.experimentName)
         sys.exit(1)
@@ -347,12 +351,14 @@ class NdnWifiTopo(Topo):
         Topo.__init__(self, **opts)
 
         global stations_conf
+        global cars_conf
         global accessPoints_conf
         global switches_conf
         global links_conf
 
         # parse configure file of topology
         stations_conf = parse_stations(conf_arq)
+        cars_conf = parse_cars(conf_arq)
         accessPoints_conf = parse_accessPoints(conf_arq)
         switches_conf = parse_switches(conf_arq)
         links_conf = parse_links(conf_arq)
@@ -365,7 +371,13 @@ class NdnWifiTopo(Topo):
                 self.isLimited = True
             self.addStation(station.name, app=station.app, params=station.uri_tuples,\
                             cpu=station.cpu,cores=station.cores,cache=station.cache, workdir=workDir)
-
+        for car in cars_conf:
+            if car.cpu != None and self.isLimited != True:
+                self.isLimited = True
+            # No addCar() function in topo.py file.
+            self.addStation(car.name, app=car.app, params=car.uri_tuples,\
+                            cpu=car.cpu,cores=car.cores,cache=car.cache, workdir=workDir, func='adhoc') 
+                            # params 'func' is for v2v communication in adhoc mode
         # Add accessPoint object in wifi network topology
         for accessPoint in accessPoints_conf:
             self.addAccessPoint(accessPoint.name)
@@ -440,24 +452,24 @@ def execute(options):
     #build a wire network or a wireless network according to a network topology.
     t = datetime.datetime.now()
     if options.isWiFi: #for wireless network.
-        """Build manet or a stationary ad hoc network according to topology configure"""
+        """Build manet ,a stationary ad hoc network or vanet according to topology configure"""
+        options.wmediumd=True
+        options.interference=True
         if options.isManet and options.isAdhoc:
             options.isAdhoc = False
         if options.isManet or options.isAdhoc: # for ad hoc network
-            options.wmediumd=True
-            options.interference=True
             build_adhocnet(wifiTopo, options.isManet, options.isAdhoc, options.ssid, options.channel,
                            options.mode, options.wmediumd, options.interference,
                            options.cluster, options.placement, options.servers, options.tunnelType,
                            options.ctime, options.nPings, options.pctTraffic, options.experimentName, options.nlsrSecurity)
         else:
-            if options.isVndn:
+            if options.isVndn: #emulate vanet
                 options.ssid='vanet-ssid'
                 build_vndn(wifiTopo, options.ssid, options.channel, options.mode, options.wmediumd, options.interference,
                            options.cluster, options.placement, options.servers, options.tunnelType,
                            options.ctime, options.nPings, options.pctTraffic, options.experimentName, options.nlsrSecurity)
             else:
-                if options.isSumoVndn:
+                if options.isSumoVndn: #emulate vanet based on sumo
                     options.ssid='vanet-ssid'
                     build_sumo_vndn(wifiTopo, options.ssid, options.channel, options.mode, options.wmediumd, options.interference,
                                     options.cluster, options.placement, options.servers, options.tunnelType,
@@ -466,7 +478,7 @@ def execute(options):
                     #for a simple wireless network with APs
                     if not (options.ssid =='my-ssid'):
                         options.ssid='my-ssid'
-                        net = Mininet(wifiTopo, host=NdnHost, station=NdnHost, link=TCLink, isWiFi=options.isWiFi,
+                        net = Mininet(wifiTopo, host=NdnHost, station=NdnHost, link=TCLink, isWiFi=options.isWiFi, 
                                       channel=options.channel, ssid=options.ssid, controller=Controller, accessPoint=OVSKernelAP)
                     t2 = datetime.datetime.now()
                     delta = t2 - t

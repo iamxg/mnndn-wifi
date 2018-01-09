@@ -26,18 +26,18 @@ def topology():
         max_ = random.randint(11, 30)
         cars[x] = net.addCar('car%s' % (x + 1), wlans=1,
                              ip='10.0.0.%s/8'% (x + 1), min_speed=min_,
-                             max_speed=max_, range=100)
+                             max_speed=max_, range=50)
 
     rsu11 = net.addAccessPoint('RSU11', ssid='RSU11', mode='g',
-                               channel='1', range=50,position='150,200,0')
+                               channel='1', range=100,position='150,200,0')
     rsu12 = net.addAccessPoint('RSU12', ssid='RSU12', mode='g',
-                               channel='6', range=50, position= '450,350,0')
+                               channel='6', range=100, position= '450,350,0')
     rsu13 = net.addAccessPoint('RSU13', ssid='RSU13', mode='g',
-                               channel='11', range=50, position= '300,100,0')
+                               channel='11', range=100, position= '300,100,0')
     rsu14 = net.addAccessPoint('RSU14', ssid='RSU14', mode='g',
-                               channel='11', range=50, position= '300,300,0')
+                               channel='11', range=100, position= '300,300,0')
     rsu15 = net.addAccessPoint('RSU15', ssid='RSU15', mode='g',
-                               channel='11', range=50, position= '100,350,0')
+                               channel='11', range=100, position= '100,350,0')
 
     c1 = net.addController('c1', controller=Controller)
 

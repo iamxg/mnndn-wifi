@@ -4,14 +4,15 @@
 propagation Model function must be call just before
 calling of function for configuring wifi node.
 So, need to this program. """
+import os
 import sys
 import datetime
 import random # This line for graph
-from subprocess import call
+from subprocess import call, check_output, CalledProcessError
 from mininet.net import Mininet
 from mini_ndn.ndn.ndn_host import NdnHost
 from mininet.link import TCLink
-from mininet.node import Controller
+from mininet.node import Controller, OVSKernelSwitch
 from mininet.log import setLogLevel, output, info
 from mininet.examples.cluster import MininetCluster, RoundRobinPlacer, ClusterCleanup
 from mininet.wifiLink import Association
@@ -19,7 +20,6 @@ from ndnwifi.wifiutil import MiniNdnWifiCLI
 import matplotlib.pyplot as plt
 from ndn.nfd import Nfd
 from ndnwifi import WifiExperimentManager
-
 
 # build_adhocnet function() is usd to replace BuildFromTopo() function in mininet/net.py
 def build_sumo_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
@@ -47,113 +47,145 @@ def build_sumo_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
     #build a wire network or a wirelesswork network.
     #topology object adhocTopo can't make as  params in Mininet object definination.
 #    if vndnTopo.isTCLink == True and vndnTopo.isLimited == True:
-        #vndn = Mininet(host=CpuLimitedNdnHost, station=CpuLimitedNdnHost, link=TCLink,controller=Controller,
+        #sumo_vndn = Mininet(host=CpuLimitedNdnHost, station=CpuLimitedNdnHost, link=TCLink,controller=Controller,
         #                   ssid=ssid, channel=channel, mode=mode, enable_wmediumd=wmediumd,
         #                   enable_interference=interference)
 #    elif vndnTopo.isTCLink == True and vndnTopo.isLimited == False:
 #        if cluster is not None:
         #    mn = partial(MininetCluster, servers=servers, placement=placement)
-        #    vndn = mn(host=NdnHost, station=NdnHost, link=TCLink,controller=Controller,
+        #    sumo_vndn = mn(host=NdnHost, station=NdnHost, link=TCLink,controller=Controller,
         #                  ssid=ssid, channel=channel, mode=mode, enable_wmediumd=wmediumd,
         #                  enable_interference=interference)
 #        else:
-        #    vndn = Mininet(host=NdnHost, station=NdnHost, link=TCLink, controller=Controller,
+        #    sumo_vndn = Mininet(host=NdnHost, station=NdnHost, link=TCLink, controller=Controller,
         #                       ssid=ssid, channel=channel, mode=mode, enable_wmediumd=wmediumd,
         #                       enable_interference=interference)
 
 #    elif vndnTopo.isTCLink == False and vndnTopo.isLimited == True:
-        #vndn = Mininet(host=CpuLimitedNdnHost, station=CpuLimitedNdnHost, controller=Controller, ssid=ssid, channel=channel,
+        #sumo_vndn = Mininet(host=CpuLimitedNdnHost, station=CpuLimitedNdnHost, controller=Controller, ssid=ssid, channel=channel,
         #               mode=mode, enable_wmediumd=wmediumd, enable_interference=interference)
 
 #    else:
-    vndn = Mininet(host=NdnHost, station=NdnHost, controller=Controller, ssid=ssid, channel=channel,
+    sumo_vndn = Mininet(host=NdnHost, station=NdnHost, car=NdnHost, controller=Controller, switch=OVSKernelSwitch ,ssid=ssid, channel=channel,
                    mode=mode, enable_wmediumd=wmediumd, enable_interference=interference)
 
 
     # Possibly we should clean up here and/or validate
     # the topo
-    if vndn.cleanup:
+    if sumo_vndn.cleanup:
         pass
 
     info('*** Creating adhoc network\n')
-    if not vndn.controllers and vndn.controller:
+    if not sumo_vndn.controllers and sumo_vndn.controller:
         # Add a default controller
         info('*** Adding controller\n')
-        classes = vndn.controller
+        classes = sumo_vndn.controller
         if not isinstance(classes, list):
             classes = [ classes ]
         for i, cls in enumerate(classes):
             # Allow Controller objects because nobody understands partial()
             if isinstance(cls, Controller):
-                vndn.addController(cls)
+                sumo_vndn.addController(cls)
             else:
-                vndn.addController('c%d' % i, cls, ip='127.0.0.1', port=6633)
+                sumo_vndn.addController('c%d' % i, cls, ip='127.0.0.1', port=6633)
             info('c%d' %i)
 
     info('\n*** Adding hosts and stations:\n')
     x=0
-    for hostName in vndnTopo.hosts():
-        min = random.randint(1, 10)
-        max = random.randint(11, 30)
-        if 'car' in str(hostName):
-            vndn.addCar(hostName, wlans=1,  min_speed=min, max_speed=max, **vndnTopo.nodeInfo(hostName))
+    for carName in vndnTopo.hosts():
+        if 'car' in str(carName):
+            sumo_vndn.addCar(carName,ip='10.0.0.%s/8'% (x + 1), wlans=1, range=50, **vndnTopo.nodeInfo(carName))
         else:
-            vndn.addHost(hostName, **vndnTopo.nodeInfo(hostName))
+            sumo_vndn.addHost(carName, **vndnTopo.nodeInfo(carName))
         x=x+1
-        info(hostName + ' ')
+        info(carName + ' ')
 
     info('\n*** Adding accessPoints and Road Sides Units:\n')
 #    for switchName in vndnTopo.accessPoints():
 #        # A bit ugly: add batch parameter if appropriate
 #        params = vndnTopo.nodeInfo(switchName)
-#        cls = params.get('cls', vndn.switch)
+#        cls = params.get('cls', sumo_vndn.switch)
 #        if hasattr(cls, 'batchStartup'):
 #            params.setdefault('batch', True)
 #        if 'rsu' in str(switchName):
-#            vndn.addAccessPoint(switchName, ssid="vanet-ssid", passwd='123456789a', encrypt='wpa2', **params)
+#            sumo_vndn.addAccessPoint(switchName, ssid="vanet-ssid", passwd='123456789a', encrypt='wpa2', **params)
 #        else:
-#            vndn.addSwitch(switchName, **params)
+#            sumo_vndn.addSwitch(switchName, **params)
 #            info(switchName + ' ')
 
-    rsu1 = vndn.addAccessPoint('rsu1', ssid='vanet-ssid', mac='00:00:00:11:00:01', mode='g', channel='1', passwd='123456789a', encrypt='wpa2', position='3279.02,3736.27,0')
-    rsu2 = vndn.addAccessPoint('rsu2', ssid='vanet-ssid', mac='00:00:00:11:00:02', mode='g', channel='6', passwd='123456789a', encrypt='wpa2', position='2320.82,3565.75,0')
-    rsu3 = vndn.addAccessPoint('rsu3', ssid='vanet-ssid', mac='00:00:00:11:00:03', mode='g', channel='11', passwd='123456789a', encrypt='wpa2', position='2806.42,3395.22,0')
-    rsu4 = vndn.addAccessPoint('rsu4', ssid='vanet-ssid', mac='00:00:00:11:00:04', mode='g', channel='1', passwd='123456789a', encrypt='wpa2', position='3332.62,3253.92,0')
+    rsu1 = sumo_vndn.addAccessPoint('rsu1', ssid='vanet-ssid', mac='00:00:00:11:00:01', mode='g', channel='1', passwd='123456789a',
+                               encrypt='wpa2', position='3279.02,3736.27,0',range=100)
+    rsu2 = sumo_vndn.addAccessPoint('rsu2', ssid='vanet-ssid', mac='00:00:00:11:00:02', mode='g', channel='6', passwd='123456789a',
+                               encrypt='wpa2', position='2320.82,3565.75,0',range=100)
+    rsu3 = sumo_vndn.addAccessPoint('rsu3', ssid='vanet-ssid', mac='00:00:00:11:00:03', mode='g', channel='11', passwd='123456789a',
+                               encrypt='wpa2', position='2806.42,3395.22,0', range=100)
+    rsu4 = sumo_vndn.addAccessPoint('rsu4', ssid='vanet-ssid', mac='00:00:00:11:00:04', mode='g', channel='1', passwd='123456789a',
+                               encrypt='wpa2', position='3332.62,3253.92,0', range=100)
 
     info('\n*** Configuring propagation model...\n')
-    # this code line must be put here
-    vndn.propagationModel("logDistancePropagationLossModel", exp=2.5)
-    #Only can use this propagation model
+    sumo_vndn.propagationModel(model="logDistance", exp=4.5) # An error that tx power is negative if negiexp=2.5
 
     print "*** Setting bgscan"
-    vndn.setBgscan(signal=-45, s_inverval=5, l_interval=10)
+    sumo_vndn.setBgscan(signal=-45, s_inverval=5, l_interval=10)
 
     print "*** Configuring Propagation Model"
-    vndn.propagationModel("logDistancePropagationLossModel", exp=2)
+    sumo_vndn.propagationModel(model="logDistance", exp=4)
 
 
     info('\n*** Configuring wifi nodes...\n')
-    vndn.configureWifiNodes()
+    sumo_vndn.configureWifiNodes()
 
     info('\n*** Adding link(s):\n')
-    #for station in vndn.stations:
-    #    vndn.addHoc(station, ssid = ssid, mode = mode)
     i=0
-    while i<len(vndn.accessPoints)-1:
-        vndn.addLink(vndn.accessPoints[i], vndn.accessPoints[i+1])
+    while i<len(sumo_vndn.aps)-1:
+        sumo_vndn.addLink(sumo_vndn.aps[i], sumo_vndn.aps[i+1])
         i=i+1
 
     "Available Options: sumo, sumo-gui"
-    vndn.useExternalProgram('sumo-gui', config_file='map.sumocfg')
+    sumo_vndn.useExternalProgram('sumo-gui', config_file='map.sumocfg')
+    print "starting network....."
+    sumo_vndn.build()
+    sumo_vndn.controllers[0].start()
+    for rsu in sumo_vndn.aps:
+        rsu.start(sumo_vndn.controllers)
+
+    i = 201
+    for sw in sumo_vndn.carsSW:
+        sw.start(sumo_vndn.controllers)
+        os.system('ip addr add 10.0.0.%s dev %s' % (i, sw))
+        i += 1
+
+    i = 1
+    j = 2
+    k = 1
+    for car in sumo_vndn.cars:
+        car.setIP('192.168.0.%s/24' % k, intf='%s-wlan0' % car)
+        car.setIP('192.168.1.%s/24' % i, intf='%s-eth0' % car)
+        car.cmd('ip route add 10.0.0.0/8 via 192.168.1.%s' % j)
+        i += 2
+        j += 2
+        k += 1
+
+    i = 1
+    j = 2
+    for v in sumo_vndn.carsSTA:
+        v.setIP('192.168.1.%s/24' % j, intf='%s-eth0' % v)
+        #v.setIP('10.0.0.%s/24' % i, intf='%s-mp0' % v) # This is for v2v communication in mesh mode
+        v.setIP('10.0.0.%s/24' % i, intf='%s-wlan0' % v) #This is for v2v communication in ad hoc mode
+        v.cmd('echo 1 > /proc/sys/net/ipv4/ip_forward')
+        i += 1
+        j += 2
 
 
-    t2 = datetime.datetime.now()
-    delta = t2 - t
-    info('Setup time: ' + str(delta.seconds) + '\n')
+    for v1 in sumo_vndn.carsSTA:
+        i = 1
+        j = 1
+        for v2 in sumo_vndn.carsSTA:
+            if v1 != v2:
+                v1.cmd('route add -host 192.168.1.%s gw 10.0.0.%s' % (j, i))
+            i += 1
+            j += 2
 
-    print "*** Starting network"
-    vndn.build()
-    #vndn.Controller.start()
 
     # Load experiment
 
@@ -161,8 +193,10 @@ def build_sumo_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
         print("Loading experiment: %s" % experimentName)
 
         experimentArgs = {
-            "isWiFi":True,
-            "net": adhocnet,
+            "isWiFi": True,
+            "isVndn": False,
+            "isSumoVndn": True,
+            "net": sumo_vndn,
             "ctime": ctime,
             "nPings": nPings,
             "strategy": Nfd.STRATEGY_BEST_ROUTE,
@@ -177,16 +211,26 @@ def build_sumo_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
         else:
             print("ERROR: Experiment '%s' does not exist" % experimentName)
             return
-
+    #Get ID of a specified process
+    def getPIDs(process):
+        processID = ""
+        try:
+            pidlist = map(int, check_output(["pidof", process]).split())
+        except  CalledProcessError:
+            pidlist = []
+        processID = processID + "".join(str(e) for e in pidlist)
+        return processID
 
     """Running CLI....."""
-    MiniNdnWifiCLI(vndn)
+    MiniNdnWifiCLI(sumo_vndn)
 
     print "*** Stopping network"
-    vndn.stop()
+    sumo_vndn.stop()
 
     print('Cleaning up...')
     call(["nfd-stop"])
     call(["sudo", "mn", "--clean"])
+    call(["sudo", "kill", "%s" % getPIDs("sumo-gui")])
     sys.exit(1)
+
 

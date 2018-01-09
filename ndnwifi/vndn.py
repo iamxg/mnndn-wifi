@@ -7,12 +7,12 @@ So, need to this program. """
 import os
 import sys
 import datetime
-import random # This line for graph
+import random
 from subprocess import call
 from mininet.net import Mininet
 from mini_ndn.ndn.ndn_host import NdnHost
 from mininet.link import TCLink
-from mininet.node import Controller
+from mininet.node import Controller, OVSKernelSwitch, OVSKernelAP
 from mininet.log import setLogLevel, output, info
 from mininet.examples.cluster import MininetCluster, RoundRobinPlacer, ClusterCleanup
 from mininet.wifiLink import Association
@@ -24,7 +24,7 @@ from ndnwifi import WifiExperimentManager
 
 # build_adhocnet function() is usd to replace BuildFromTopo() function in mininet/net.py
 def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
-                   cluster, placement, servers, tunnelType, ctime, nPings, pctTraffic, experimentName, nlsrSecurity):
+               cluster, placement, servers, tunnelType, ctime, nPings, pctTraffic, experimentName, nlsrSecurity):
     """Create an ad hoc network from a topology object
        At the end of this function, everything should be connected
        and up..
@@ -67,8 +67,8 @@ def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
         #               mode=mode, enable_wmediumd=wmediumd, enable_interference=interference)
 
 #    else:
-    vndn = Mininet(host=NdnHost, station=NdnHost, car=NdnHost, controller=Controller, ssid=ssid, channel=channel,
-                           mode=mode, enable_wmediumd=wmediumd, enable_interference=interference)
+    vndn = Mininet(host=NdnHost, station=NdnHost, car=NdnHost, controller=Controller, switch=OVSKernelSwitch, ssid=ssid, channel=channel,
+                    mode=mode, enable_wmediumd=wmediumd, enable_interference=interference)
 
 
     # Possibly we should clean up here and/or validate
@@ -76,7 +76,7 @@ def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
     if vndn.cleanup:
         pass
 
-    info('*** Creating adhoc network\n')
+    info('*** Creating ndn based vehicle network\n')
     if not vndn.controllers and vndn.controller:
         # Add a default controller
         info('*** Adding controller\n')
@@ -91,81 +91,81 @@ def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
                 vndn.addController('c%d' % i, cls)
             info('c%d' %i)
 
-    info('\n*** Adding hosts and stations:\n')
+    info('\n*** Adding cars and car stations:\n')
     x=0
-    for hostName in vndnTopo.hosts():
-        min = random.randint(1, 10)
-        max = random.randint(11, 30)
-        if 'car' in str(hostName):
-          #  vndn.addCar(hostName, wlans=1, ip='10.0.0.%s/8' % (x + 1), min_speed=min, max_speed=max, **vndnTopo.nodeInfo(hostName))
-            vndn.addCar(hostName, wlans=1,  min_speed=min, max_speed=max, **vndnTopo.nodeInfo(hostName))
+    for carName in vndnTopo.hosts():
+        min = random.randint(1, 5)
+        max = random.randint(5, 15)
+        if 'car' in str(carName):
+            vndn.addCar(carName, ip='10.0.0.%s/8'% (x + 1), wlans=1, range='100', 
+                        min_speed=min, max_speed=max, **vndnTopo.nodeInfo(carName))
         else:
-            vndn.addHost(hostName, **vndnTopo.nodeInfo(hostName))
+            vndn.addHost(carName, **vndnTopo.nodeInfo(carName))
         x=x+1
-        info(hostName + ' ')
+        info(carName + ' ')
 
-    info('\n*** Adding accessPoints and Road Sides Units:\n')
-    for switchName in vndnTopo.accessPoints():
+    info('\n*** Adding Road Sides Units:\n')
+    channelValueList = [1, 6, 11]
+    i=0
+    for accessPointName in vndnTopo.accessPoints():
         # A bit ugly: add batch parameter if appropriate
-        params = vndnTopo.nodeInfo(switchName)
-        cls = params.get('cls', vndn.switch)
+        i = i+1
+        #randomly select a channel value
+        channelValue = channelValueList[random.randint(0, len(channelValueList)-1)]
+        params = vndnTopo.nodeInfo(accessPointName)
+        cls = params.get('cls', vndn.accessPoint)
         if hasattr(cls, 'batchStartup'):
             params.setdefault('batch', True)
-        if 'rsu' in str(switchName):
-            vndn.addAccessPoint(switchName, ssid="vanet-ssid", passwd='123456789a', encrypt='wpa2', **params)
+        if 'rsu' in str(accessPointName):
+            vndn.addAccessPoint(accessPointName, ssid="RSU1%s" %i, range='50', mode='g', channel='%s' %channelValue, **params)
         else:
-            vndn.addSwitch(switchName, **params)
-            info(switchName + ' ')
-
+            vndn.addSwitch(accessPointName, **params)
+            info(accessPointName + ' ')
+        info(accessPointName + ' ')
 
     info('\n*** Configuring propagation model...\n')
     # this code line must be put here
-    vndn.propagationModel("logDistancePropagationLossModel", exp=2)
+    vndn.propagationModel(model="logDistance", exp=4.5)
     #Only can use this propagation model
 
     info('\n*** Configuring wifi nodes...\n')
     vndn.configureWifiNodes()
 
-    info('\n*** Adding link(s):\n')
-    #for station in vndn.stations:
-    #    vndn.addHoc(station, ssid = ssid, mode = mode)
-    i=0
-    while i<len(vndn.accessPoints)-1:
-        vndn.addLink(vndn.accessPoints[i], vndn.accessPoints[i+1])
-        i=i+1
+    info('\n*** Adding links......\n')
+    for srcName, dstName, params in vndnTopo.links(sort=True, withInfo=True):
+        vndn.addLink(**params)
+        info('(%s, %s) ' % (srcName, dstName))
+    info('\n')
 
-    t2 = datetime.datetime.now()
-    delta = t2 - t
-    info('Setup time: ' + str(delta.seconds) + '\n')
     print "*** Starting network"
-    vndn.plotGraph(max_x=500, max_y=500, max_z=0)
+    vndn.plotGraph(max_x=500, max_y=500)
 
     """Number of Roads"""
     vndn.roads(10)
 
     """Start Mobility"""
     # this code line must be put here
-
     vndn.startMobility(startTime=0)
+
+    print "start network......"
     vndn.build()
-    print "start controller......."
     vndn.controllers[0].start()
-    
-    for rsu in vndn.accessPoints:
+    for rsu in vndn.aps:
         rsu.start(vndn.controllers)
+
     i = 201
     for sw in vndn.carsSW:
         sw.start(vndn.controllers)
-        os.system('ifconfig %s 10.0.0.%s' % (sw, i))
+        os.system('ip addr add 10.0.0.%s dev %s' % (i, sw))
         i += 1
 
     i = 1
     j = 2
     k = 1
-    for c in vndn.cars:
-        c.cmd('ifconfig %s-wlan0 192.168.0.%s/24 up' % (c, k))
-        c.cmd('ifconfig %s-eth0 192.168.1.%s/24 up' % (c, i))
-        c.cmd('ip route add 10.0.0.0/8 via 192.168.1.%s' % j)
+    for car in vndn.cars:
+        car.setIP('192.168.0.%s/24' % k, intf='%s-wlan0' % car)
+        car.setIP('192.168.1.%s/24' % i, intf='%s-eth0' % car)
+        car.cmd('ip route add 10.0.0.0/8 via 192.168.1.%s' % j)
         i += 2
         j += 2
         k += 1
@@ -173,11 +173,13 @@ def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
     i = 1
     j = 2
     for v in vndn.carsSTA:
-        v.cmd('ifconfig %s-eth0 192.168.1.%s/24 up' % (v, j))
-        v.cmd('ifconfig %s-mp0 10.0.0.%s/24 up' % (v, i))
+        v.setIP('192.168.1.%s/24' % j, intf='%s-eth0' % v)
+        #v.setIP('10.0.0.%s/24' % i, intf='%s-mp0' % v) # This is for v2v communication in mesh mode
+        v.setIP('10.0.0.%s/24' % i, intf='%s-wlan0' % v) #This is for v2v communication in ad hoc mode
         v.cmd('echo 1 > /proc/sys/net/ipv4/ip_forward')
         i += 1
         j += 2
+
 
     for v1 in vndn.carsSTA:
         i = 1
@@ -195,8 +197,10 @@ def build_vndn(vndnTopo, ssid, channel, mode, wmediumd, interference,
         print("Loading experiment: %s" % experimentName)
 
         experimentArgs = {
-            "isWiFi":True,
-            "net": adhocnet,
+            "isWiFi": True,
+            "isVndn": True,
+            "isSumoVndn": False,
+            "net": vndn,
             "ctime": ctime,
             "nPings": nPings,
             "strategy": Nfd.STRATEGY_BEST_ROUTE,
