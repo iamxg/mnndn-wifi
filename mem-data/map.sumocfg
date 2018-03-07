@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <input>
+        <net-file value="osm.net.xml"/>
+        <route-files value="osm.rou.xml"/>
+        <additional-files value="osm.poly.xml"/>
+    </input>
+
+    <output>
+        <tripinfo-output value="maptripinfo.out.xml"/>
+    </output>
+
+    <time>
+        <begin value="0"/>
+        <end value="1000"/>
+        <step-length value="0.1"/>
+    </time>
+
+    <report>
+        <verbose value="true"/>
+        <duration-log.statistics value="true"/>
+        <no-step-log value="true"/>
+    </report>
+
+    <traci_server>
+         <processing>
+                <time-to-teleport value="100"/>
+         </processing>
+         <remote-port value="8813"/>
+    </traci_server>
+
+    <gui_only>
+        <gui-settings-file value="osm.view.xml"/>
+    </gui_only>
+
+
+</configuration>
+
+
