@@ -1,6 +1,7 @@
 ; "transport" specifies Face's default transport connection.
 ; The value is a unix or tcp4 scheme Face URI.
 ;
+；
 ; For example:
 ;
 ;   unix:///var/run/nfd.sock
