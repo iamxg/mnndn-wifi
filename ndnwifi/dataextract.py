@@ -1,7 +1,7 @@
 import re
 import time
 from time import strftime
-# Calculate packet loss ratio
+# Calculate packet loss ratio value
 input_file = open("communicateData.dat", "r")
 packLossData_file = open ("packLossData.dat", "a")
 delayData_file = open ("delayData.dat", "a")
