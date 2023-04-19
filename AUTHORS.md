@@ -19,7 +19,7 @@ Mini-NDN is an open source project that includes contributions from the followin
     * Junxiao Shi    <http://www.cs.arizona.edu/people/shijunxiao/>
     * Beichuan Zhang <http://www.cs.arizona.edu/~bzhang/>
 
-* University of California, Los Angeles
+* University of California, Los Angeles, USA
 
     * Alexander Afanasyev <http://lasr.cs.ucla.edu/afanasyev/index.html>
 
