@@ -1,6 +1,7 @@
 MiniNDN-WiFi Installing Instructions
 ================================
 
+
 ### What equipment will I need ?
 
 Basically, you'll need a laptop/desktop with a recent Linux distro (Ubuntu, Fedora).
